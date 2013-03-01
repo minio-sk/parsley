@@ -1,5 +1,8 @@
 # Parsley
 
+[![Build Status](https://travis-ci.org/minio-sk/parsley.png)](https://travis-ci.org/minio-sk/parsley)
+
+
 TODO: Write a gem description
 
 ## Installation
