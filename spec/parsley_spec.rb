@@ -39,7 +39,8 @@ describe Parsley do
   let(:downloader) { mock(:Downloader) }
   let(:archiver) { mock(:Archiver) }
   let(:unzipper) { mock(:Unzipper) }
-  let(:infrastructure) { Parsley.new(downloader: downloader, archiver: archiver, unzipper: unzipper) }
+  let(:extractor) { mock(:Extractor) }
+  let(:infrastructure) { Parsley.new(downloader: downloader, archiver: archiver, unzipper: unzipper, extractor: extractor) }
 
   describe '#download_file' do
     it 'downloads a file and return contents' do
@@ -183,8 +184,9 @@ describe Parsley do
 
   describe '#extract_text' do
     it 'should extract plain text from a document file' do
-      file = File.dirname(__FILE__) + '/fixtures/example.rtf'
-      infrastructure.extract_text(file).should == 'Hello from RTF.'
+      extractor.should_receive(:extract).with(:file).and_return('Hello from RTF. ')
+
+      infrastructure.extract_text(:file).should == 'Hello from RTF.'
     end
   end
 

@@ -7,6 +7,7 @@ require 'parsley/instant_queue'
 require 'parsley/job'
 require 'parsley/sidekiq_queue'
 require 'parsley/system_unzipper'
+require 'parsley/unoconv_extractor'
 
 require 'tmpdir'
 
@@ -16,6 +17,7 @@ class Parsley
     @downloader = options[:downloader] || CurbDownloader
     @archiver = options[:archiver] || FileSystemArchiver.new('~/parsley')
     @unzipper = options[:unzipper] || SystemUnzipper
+    @extractor = options[:extractor] || UnoconvExtractor
     @self_class = options[:self] || self.class
     @job_chain = Hash.new { |hash, key| hash[key] = [] }
   end
@@ -97,7 +99,7 @@ class Parsley
   end
 
   def extract_text(file)
-    clean_whitespace(`unoconv -f txt --stdout #{file} 2>/dev/null`).strip
+    clean_whitespace(@extractor.extract(file)).strip
   end
 
   def archive(path, data, options = {})
