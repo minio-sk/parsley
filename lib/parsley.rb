@@ -68,7 +68,12 @@ class Parsley
   def download_file(url, options = {})
     options = DEFAULT_DOWNLOAD_FILE_OPTIONS.merge(options)
     if options[:read_contents]
-      html = @downloader.download(url)
+      html = if options[:http_options]
+               @downloader.download(url, options[:http_options])
+             else
+               @downloader.download(url)
+             end
+
       @archiver.archive(options[:archive], html) if options[:archive]
       clean_html(html, options)
     else

@@ -1,7 +1,9 @@
 class Parsley
   class CurbDownloader
-    def self.download(url)
-      Curl.get(url).body_str
+    def self.download(url, options = {})
+      Curl.get(url) do |curl|
+        curl.headers['User-Agent'] = options[:useragent] if options[:useragent]
+      end.body_str
     end
 
     def self.download_to_file(url, path)

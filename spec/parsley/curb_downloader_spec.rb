@@ -1,0 +1,18 @@
+require 'parsley'
+
+describe Parsley::CurbDownloader do
+  it 'passes user agent to curl request' do
+    headers = double(:headers)
+    headers.should_receive(:[]=).with('User-Agent', :something)
+
+    yield_options = double(:options)
+    yield_options.should_receive(:headers).and_return(headers)
+
+    curl = double.as_null_object
+    curl.should_receive(:get).with('url').and_yield(yield_options).and_return(curl)
+
+    stub_const('Curl', curl)
+
+    described_class.download('url', {useragent: :something})
+  end
+end

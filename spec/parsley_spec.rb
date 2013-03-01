@@ -96,6 +96,11 @@ describe Parsley do
       downloader.should_receive(:download_to_file).with('url', archive_path).and_return(archive_path)
       infrastructure.download_file('url', archive: 'orsr.sk/1/1.html').should == archive_path
     end
+
+    it 'passes http options to downloader' do
+      downloader.should_receive(:download).with('url', {useragent: :something}).and_return('<html>')
+      infrastructure.download_html('url', http_options: {useragent: :something})
+    end
   end
 
   describe '#clean_html' do
