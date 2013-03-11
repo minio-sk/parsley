@@ -1,6 +1,6 @@
 # Parsley
 
-[![Build Status](https://travis-ci.org/minio-sk/parsley.png)](https://travis-ci.org/minio-sk/parsley)
+[![Build Status](https://travis-ci.org/minio-sk/parsley.png)](https://travis-ci.org/minio-sk/parsley) [![Code Climate](https://codeclimate.com/github/minio-sk/parsley.png)](https://codeclimate.com/github/minio-sk/parsley)
 
 
 TODO: Write a gem description
