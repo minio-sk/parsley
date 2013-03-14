@@ -176,9 +176,15 @@ describe Parsley do
 
   describe '#unzip' do
     it 'unzips the file' do
-      archive_path =  'path/to/archive.zip'
-      unzipper.should_receive(:unzip).with(archive_path, anything).and_return('unzipped_file')
+      archiver.should_receive(:archive_path).with('path/to/archive.zip').and_return('segmented/path')
+      unzipper.should_receive(:unzip).with('segmented/path', anything).and_return('unzipped_file')
       infrastructure.unzip('path/to/archive.zip').should == 'unzipped_file'
+    end
+
+    it 'unzips the file in-place' do
+      archiver.stub(archive_path: 'segmented/path')
+      unzipper.should_receive(:unzip).with('segmented/path', nil)
+      infrastructure.unzip('path/to/archive.zip', in_place: true)
     end
   end
 

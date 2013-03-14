@@ -106,8 +106,13 @@ class Parsley
     @archiver.archive(path, data, options)
   end
 
-  def unzip(path)
-    @unzipper.unzip(path, create_temp_file_name)
+  def unzip(path, options = {})
+    if options[:in_place]
+      target = nil
+    else
+      target = create_temp_file_name
+    end
+    @unzipper.unzip(@archiver.archive_path(path), target)
   end
 
   def find_files(pattern)
