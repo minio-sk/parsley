@@ -18,7 +18,9 @@ class Parsley
       else
         write_options = { mode: "w" }
       end
-      File.write(archive_path(path), contents, write_options)
+      archived = archive_path(path)
+      File.write(archived, contents, write_options)
+      archived
     end
 
     class NumericSegmenter

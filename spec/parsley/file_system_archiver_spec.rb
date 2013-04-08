@@ -22,4 +22,13 @@ describe Parsley::FileSystemArchiver do
     File.should_receive(:write).with("/app/archives/orsr.sk/1.html", "<html>", mode: "wb")
     subject.archive('orsr.sk/1.html', '<html>', binary: true)
   end
+
+  it 'returns path to archived file' do
+    FileUtils.stub(mkdir_p: nil)
+    File.stub(:write)
+    segmenter = mock
+    archiver = described_class.new('/app/archives', segmenter)
+    segmenter.stub(segment: 'segmented/path')
+    archiver.archive('path', 'content').should == '/app/archives/segmented/path'
+  end
 end

@@ -163,6 +163,11 @@ describe Parsley do
       infrastructure.archive('path', 'data', binary: true)
     end
 
+    it 'returns path to archived data' do
+      archiver.stub(archive: '/archive/path')
+      infrastructure.archive('path', 'data').should == '/archive/path'
+    end
+
     pending 'archives arbitrary file' do
       infrastructure.archive(file, 'archived_file_path')
     end
@@ -176,14 +181,12 @@ describe Parsley do
 
   describe '#unzip' do
     it 'unzips the file' do
-      archiver.should_receive(:archive_path).with('path/to/archive.zip').and_return('segmented/path')
-      unzipper.should_receive(:unzip).with('segmented/path', anything).and_return('unzipped_file')
+      unzipper.should_receive(:unzip).with('path/to/archive.zip', anything).and_return('unzipped_file')
       infrastructure.unzip('path/to/archive.zip').should == 'unzipped_file'
     end
 
     it 'unzips the file in-place' do
-      archiver.stub(archive_path: 'segmented/path')
-      unzipper.should_receive(:unzip).with('segmented/path', nil)
+      unzipper.should_receive(:unzip).with('path/to/archive.zip', nil)
       infrastructure.unzip('path/to/archive.zip', in_place: true)
     end
   end

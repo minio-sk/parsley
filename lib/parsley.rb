@@ -112,7 +112,7 @@ class Parsley
     else
       target = create_temp_file_name
     end
-    @unzipper.unzip(@archiver.archive_path(path), target)
+    @unzipper.unzip(path, target)
   end
 
   def find_files(pattern)
