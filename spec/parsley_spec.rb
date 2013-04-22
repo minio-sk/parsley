@@ -250,6 +250,13 @@ describe Parsley do
       def perform(*)
       end
     end
+    class JobThatReturnsFalse
+      include Parsley::Job
+
+      def perform(*)
+        false
+      end
+    end
 
     it 'enqueues next job in chain, feeding it with the return value of the finished job' do
       infrastructure.chain ImportExtract, CleanExtract
@@ -277,6 +284,15 @@ describe Parsley do
       infrastructure.should_receive(:enqueue).with(CleanExtract)
 
       infrastructure.enqueue(DeduplicateExtract)
+    end
+
+    it 'does not enqueue next job if the finished job returns false' do
+      infrastructure.chain JobThatReturnsFalse, CleanExtract
+
+      infrastructure.should_receive(:enqueue).with(JobThatReturnsFalse).and_call_original
+      infrastructure.should_not_receive(:enqueue).with(CleanExtract)
+
+      infrastructure.enqueue(JobThatReturnsFalse)
     end
 
     it 'enqueues all successors of the finished jobs' do

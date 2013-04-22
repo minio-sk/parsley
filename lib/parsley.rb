@@ -41,10 +41,12 @@ class Parsley
     @job_chain[job_class].each do |successor|
       results = [results] unless results.kind_of? Array
       results.each do |result|
-        if result
-          enqueue(successor, result)
-        else
-          enqueue(successor)
+        unless result === false
+          if result
+            enqueue(successor, result)
+          else
+            enqueue(successor)
+          end
         end
       end
     end
