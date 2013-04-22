@@ -1,6 +1,7 @@
 require 'nokogiri'
 require 'sidekiq'
 
+require 'parsley/command'
 require 'parsley/curb_downloader'
 require 'parsley/file_system_archiver'
 require 'parsley/instant_queue'

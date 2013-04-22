@@ -1,13 +1,13 @@
 class Parsley
   class SystemUnzipper
-    def self.unzip(file, target = nil)
+    def self.unzip(file, target = nil, command = Command.new)
       extension = File.extname(file)
       case extension
       when '.gz' then
-        `gzip -c -d #{file} > #{target}`
+        command.run('gzip -c -d ? > ?', file, target)
       when '.zip' then
         target ||= File.dirname(file)
-        `unzip #{file} -d #{target}`
+        command.run('unzip ? -d ?', file, target)
       else
         raise StandardError, "Don't know how to unzip file with extension #{extension}"
       end

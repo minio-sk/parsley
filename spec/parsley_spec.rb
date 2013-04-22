@@ -193,7 +193,7 @@ describe Parsley do
 
   describe '#extract_text' do
     it 'should extract plain text from a document file' do
-      extractor.should_receive(:extract).with(:file).and_return('Hello from RTF. ')
+      extractor.should_receive(:extract).with(:file).and_return('Hello from RTF.')
 
       infrastructure.extract_text(:file).should == 'Hello from RTF.'
     end
