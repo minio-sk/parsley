@@ -10,11 +10,10 @@ class Parsley
           idx += 1
         end
       end
-      exit_status, output = Open3.popen2e(escaped_command) do |stdin, stdout_stderr, wait_thr|
-        [wait_thr.value.to_i, stdout_stderr.readlines.join]
-      end
 
-      raise CommandFailed, "#{escaped_command}:\n#{output}" if exit_status != 0
+      output, exit_status = Open3.capture2e(escaped_command)
+
+      raise CommandFailed, "#{escaped_command}:\n#{output}" if exit_status.to_i != 0
       output
     end
   end
