@@ -6,12 +6,12 @@ class Parsley
     let(:command) { mock(:Command) }
 
     it 'extracts gzipped archives' do
-      command.should_receive(:run).with('gzip -c -d ? > ?', 'archive.gz', 'target')
+      command.should_receive(:run).with('gzip -f -c -d ? > ?', 'archive.gz', 'target')
       SystemUnzipper.unzip('archive.gz', 'target', command).should == 'target'
     end
 
     it 'extracts zipped archives' do
-      command.should_receive(:run).with('unzip ? -d ?', 'archive.zip', 'target')
+      command.should_receive(:run).with('unzip -o ? -d ?', 'archive.zip', 'target')
       SystemUnzipper.unzip('archive.zip', 'target', command).should == 'target'
     end
 
@@ -20,7 +20,7 @@ class Parsley
     end
 
     it 'fails when the system command fails' do
-      command.should_receive(:run).with('unzip ? -d ?', 'archive.zip', 'target').and_raise(Parsley::CommandFailed)
+      command.should_receive(:run).with('unzip -o ? -d ?', 'archive.zip', 'target').and_raise(Parsley::CommandFailed)
       expect { SystemUnzipper.unzip('archive.zip', 'target', command) }.to raise_error(Parsley::CommandFailed)
     end
   end

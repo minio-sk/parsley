@@ -4,10 +4,10 @@ class Parsley
       extension = File.extname(file)
       case extension
       when '.gz' then
-        command.run('gzip -c -d ? > ?', file, target)
+        command.run('gzip -f -c -d ? > ?', file, target)
       when '.zip' then
         target ||= File.dirname(file)
-        command.run('unzip ? -d ?', file, target)
+        command.run('unzip -o ? -d ?', file, target)
       else
         raise StandardError, "Don't know how to unzip file with extension #{extension}"
       end
