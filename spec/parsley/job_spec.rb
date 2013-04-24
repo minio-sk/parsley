@@ -1,3 +1,4 @@
+require 'sidekiq/worker'
 require 'parsley/job'
 
 describe Parsley::Job do
@@ -31,5 +32,17 @@ describe Parsley::Job do
     infrastructure.should_receive(:notify_job_finished).with(AJob, 'foo')
 
     AJob.new.perform(infrastructure)
+  end
+
+  it 'allows queue specification' do
+    class AJob
+      include Parsley::Job
+
+      queue :critical
+
+      def perform(*)
+      end
+    end
+    AJob.get_sidekiq_options['queue'].should == :critical
   end
 end
