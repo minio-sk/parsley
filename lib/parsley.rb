@@ -1,6 +1,7 @@
 require 'nokogiri'
 require 'sidekiq'
 
+require 'parsley/paths'
 require 'parsley/command'
 require 'parsley/curb_downloader'
 require 'parsley/file_system_archiver'
@@ -11,13 +12,14 @@ require 'parsley/system_unzipper'
 require 'parsley/unoconv_extractor'
 
 require 'tmpdir'
+require 'fileutils'
 
 class Parsley
   def initialize(options = {})
     @queue = options[:queue] || InstantQueue
     @downloader = options[:downloader] || CurbDownloader
     @archiver = options[:archiver] || FileSystemArchiver.new('~/parsley')
-    @unzipper = options[:unzipper] || SystemUnzipper
+    @unzipper = options[:unzipper] || SystemUnzipper.new
     @extractor = options[:extractor] || UnoconvExtractor
     @self_class = options[:self] || self.class
     @job_chain = Hash.new { |hash, key| hash[key] = [] }
@@ -44,7 +46,8 @@ class Parsley
       results.each do |result|
         unless result === false
           if result
-            enqueue(successor, result)
+            encoded_result = result.respond_to?(:serialize) ? result.serialize : result
+            enqueue(successor, encoded_result)
           else
             enqueue(successor)
           end
@@ -72,24 +75,29 @@ class Parsley
 
   def download_file(url, options = {})
     options = DEFAULT_DOWNLOAD_FILE_OPTIONS.merge(options)
-    if options[:read_contents]
-      html = if options[:http_options]
-               @downloader.download(url, options[:http_options])
-             else
-               @downloader.download(url)
-             end
+    http_options = options[:http_options] || {}
+    target_path = archive_path_or_tmp_path(options[:archive])
 
-      @archiver.archive(options[:archive], html) if options[:archive]
+    if options[:read_contents]
+      html = @downloader.download(url, http_options)
+      @archiver.archive(target_path, html) if options[:archive]
       clean_html(html, options)
     else
-      path = if options[:archive]
-               @archiver.archive_path(options[:archive])
-             else
-               create_temp_file_name
-             end
-      @downloader.download_to_file(url, path)
+      @downloader.download_to_file(url, target_path)
+      target_path
     end
   end
+
+  def archive_path_or_tmp_path(archive_path)
+    target_path = if archive_path
+      archive_relative_path(archive_path)
+    else
+      full_path(create_temp_file_name)
+    end
+    target_path.ensure_exists!
+    target_path
+  end
+  private :archive_path_or_tmp_path
 
   DEFAULT_DOWNLOAD_HTML_OPTIONS = {
     parse_html: true,
@@ -106,20 +114,35 @@ class Parsley
   end
 
   def archive(path, data, options = {})
-    @archiver.archive(path, data, options)
+    archive_path = archive_relative_path(path)
+    archive_path.ensure_exists!
+    @archiver.archive(archive_path, data, options)
+    archive_path
   end
 
   def unzip(path, options = {})
+    path = full_path(path) unless path.respond_to?(:full_path)
     if options[:in_place]
-      target = nil
+      target = path.dirname
+    elsif options[:to]
+      target = options[:to]
     else
-      target = create_temp_file_name
+      target = full_path(create_temp_file_name)
+      target.ensure_exists!
     end
     @unzipper.unzip(path, target)
   end
 
-  def find_files(pattern)
-    Dir.glob(@archiver.archive_path(pattern))
+  def read_archive(path)
+    @archiver.read(archive_relative_path(path))
+  end
+
+  def archive_relative_path(path)
+    Parsley::Path::ArchiveRelative.new(path, @archiver.root)
+  end
+
+  def full_path(path)
+    Parsley::Path::Full.new(path)
   end
 
   class UnsupportedJobError < RuntimeError; end

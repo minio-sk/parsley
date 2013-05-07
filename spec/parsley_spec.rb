@@ -3,6 +3,7 @@ require 'nokogiri'
 require 'sidekiq'
 
 require 'parsley'
+require 'parsley/paths'
 #require 'active_support/core_ext/string/conversions'
 #require 'active_support/core_ext/class/attribute_accessors'
 
@@ -21,6 +22,10 @@ end
 class NonParsleyJob; end
 class TestInfrastructure; end
 
+class Parsley::Path
+  def ensure_exists!; end
+end
+
 describe Parsley do
   describe "#enqueue" do
     it 'enqueues a job and passes parameters with infrastructure' do
@@ -37,7 +42,7 @@ describe Parsley do
   end
 
   let(:downloader) { mock(:Downloader) }
-  let(:archiver) { mock(:Archiver) }
+  let(:archiver) { double(:Archiver, root: '/archive') }
   let(:unzipper) { mock(:Unzipper) }
   let(:extractor) { mock(:Extractor) }
   let(:infrastructure) { Parsley.new(downloader: downloader, archiver: archiver, unzipper: unzipper, extractor: extractor) }
@@ -80,22 +85,30 @@ describe Parsley do
       infrastructure.download_file('url', read_contents: true, replace_br: true).should == "<html>Ahoj\nFerko</html>"
     end
 
-    it 'downloads a file and returns its path' do
-      downloader.should_receive(:download_to_file).with('url', anything).and_return('file')
-      infrastructure.download_file('url').should == 'file'
+    context 'without :archive option' do
+      it 'returns instance of full path' do
+        downloader.stub(:download_to_file)
+        infrastructure.download_file('url').should be_a Parsley::Path::Full
+      end
+
+      it 'downloads a file to temporary location and returns its path' do
+        downloader.should_receive(:download_to_file).with('url', anything)
+        infrastructure.download_file('url').to_s.should =~ /\/tmp/
+      end
     end
 
-    it 'downloads a file returns its contents and archives it' do
-      downloader.should_receive(:download).with('url').and_return('<html>')
-      archiver.should_receive(:archive).with('orsr.sk/1/1.html', '<html>')
-      infrastructure.download_file('url', read_contents: true, archive: 'orsr.sk/1/1.html').should == "<html>"
-    end
+    context 'with :archive option' do
+      it 'downloads a file, returns its contents and archives it' do
+        downloader.should_receive(:download).with('url', {}).and_return('<html>')
+        archiver.should_receive(:archive).with(Parsley::Path::ArchiveRelative.new('orsr.sk/1/1.html', '/archive'), '<html>')
+        infrastructure.download_file('url', read_contents: true, archive: 'orsr.sk/1/1.html').should == "<html>"
+      end
 
-    it 'download a file, returns its path and archives it' do
-      archive_path = 'archive/path/orsr.sk/1/1.html'
-      archiver.should_receive(:archive_path).with('orsr.sk/1/1.html').and_return(archive_path)
-      downloader.should_receive(:download_to_file).with('url', archive_path).and_return(archive_path)
-      infrastructure.download_file('url', archive: 'orsr.sk/1/1.html').should == archive_path
+      it 'downloads a file, returns its path and archives it' do
+        archive_path = Parsley::Path::ArchiveRelative.new('orsr.sk/1/1.html', '/archive')
+        downloader.should_receive(:download_to_file).with('url', archive_path)
+        infrastructure.download_file('url', archive: 'orsr.sk/1/1.html').should == archive_path
+      end
     end
 
     it 'passes http options to downloader' do
@@ -154,18 +167,18 @@ describe Parsley do
 
   describe '#archive' do
     it 'archives data' do
-      archiver.should_receive(:archive).with('path', 'data', {})
+      archiver.should_receive(:archive).with(Parsley::Path::ArchiveRelative.new('path', '/archive'), 'data', {})
       infrastructure.archive('path', 'data')
     end
 
     it 'archives binary data' do
-      archiver.should_receive(:archive).with('path', 'data', binary: true)
+      archiver.should_receive(:archive).with(Parsley::Path::ArchiveRelative.new('path', '/archive'), 'data', binary: true)
       infrastructure.archive('path', 'data', binary: true)
     end
 
-    it 'returns path to archived data' do
-      archiver.stub(archive: '/archive/path')
-      infrastructure.archive('path', 'data').should == '/archive/path'
+    it 'returns path relative to archive' do
+      archiver.stub(archive: nil)
+      infrastructure.archive('path', 'data').should be_a(Parsley::Path::ArchiveRelative)
     end
 
     pending 'archives arbitrary file' do
@@ -180,14 +193,50 @@ describe Parsley do
   end
 
   describe '#unzip' do
-    it 'unzips the file' do
-      unzipper.should_receive(:unzip).with('path/to/archive.zip', anything).and_return('unzipped_file')
-      infrastructure.unzip('path/to/archive.zip').should == 'unzipped_file'
+    context 'when invoked with a Path' do
+      it 'sends the path to the archiver verbatim' do
+        path = Parsley::Path::Full.new('path')
+        unzipper.should_receive(:unzip).with(path, anything)
+        infrastructure.unzip(path)
+      end
+    end
+
+    context 'when invoked with a String instead of a Path' do
+      it 'wraps the String path in a Parsley::Path::Full' do
+        unzipper.should_receive(:unzip).with(Parsley::Path::Full.new('foo.zip'), anything)
+        infrastructure.unzip('foo.zip')
+      end
+    end
+
+    it 'unzips to temporary path' do
+      unzipper.should_receive(:unzip).with do |_, target|
+        target.full_path.should =~ /\/tmp/
+      end
+      infrastructure.unzip('path')
     end
 
     it 'unzips the file in-place' do
-      unzipper.should_receive(:unzip).with('path/to/archive.zip', nil)
-      infrastructure.unzip('path/to/archive.zip', in_place: true)
+      path = Parsley::Path.new('/somewhere/here/is.zip')
+      unzipper.should_receive(:unzip).with(anything, Parsley::Path::Full.new('/somewhere/here'))
+      infrastructure.unzip(path, in_place: true)
+    end
+
+    it 'unzips the file to the specified target' do
+      target = Parsley::Path::Full.new('target')
+      unzipper.should_receive(:unzip).with(anything, target)
+      infrastructure.unzip('archive.zip', to: target)
+    end
+
+    it 'returns the unzipper return value' do
+      unzipper.stub(unzip: 'unzipped')
+      infrastructure.unzip('path').should == 'unzipped'
+    end
+  end
+
+  describe '#read_archive' do
+    it 'builds archive relative path and delegates to archiver' do
+      archiver.should_receive(:read).with(Parsley::Path::ArchiveRelative.new('file.xml', '/archive')).and_return('contents')
+      infrastructure.read_archive('file.xml').should == 'contents'
     end
   end
 
@@ -196,14 +245,6 @@ describe Parsley do
       extractor.should_receive(:extract).with(:file).and_return('Hello from RTF.')
 
       infrastructure.extract_text(:file).should == 'Hello from RTF.'
-    end
-  end
-
-  describe '#find_files' do
-    it 'finds files matching the pattern' do
-      archiver.stub(archive_path: '/archives/dir/*.xml')
-      Dir.should_receive(:glob).with('/archives/dir/*.xml').and_return([])
-      infrastructure.find_files('dir/*.xml').should == []
     end
   end
 
@@ -265,6 +306,25 @@ describe Parsley do
       infrastructure.should_receive(:enqueue).with(CleanExtract, {imported_id: 5234})
 
       infrastructure.enqueue(ImportExtract)
+    end
+
+    it 'serializes the return value if it responds to #serialize' do
+      class JobThatReturnsSerializable
+        include Parsley::Job
+
+        def perform(*)
+          Class.new do
+            def serialize
+              "serialized"
+            end
+          end.new
+        end
+      end
+
+      infrastructure.chain JobThatReturnsSerializable, CleanExtract
+      infrastructure.should_receive(:enqueue).with(JobThatReturnsSerializable).and_call_original
+      infrastructure.should_receive(:enqueue).with(CleanExtract, "serialized")
+      infrastructure.enqueue(JobThatReturnsSerializable)
     end
 
     it 'enqueues next job even if the finished job is further in chain' do

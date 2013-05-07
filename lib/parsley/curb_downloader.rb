@@ -7,7 +7,7 @@ class Parsley
     end
 
     def self.download_to_file(url, path)
-      Curl::Easy.download(url, path)
+      Curl::Easy.download(url, path.full_path)
       path
     end
   end
