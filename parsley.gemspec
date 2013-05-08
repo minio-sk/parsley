@@ -26,6 +26,6 @@ EOM
 
   gem.add_development_dependency('rspec', '~> 2.12.0')
 
-  gem.add_dependency('nokogiri', '~> 1.5.6')
+  gem.add_dependency('nokogiri', '~> 1.6.0.rc1')
   gem.add_dependency('sidekiq', '~> 2.6.4')
 end
