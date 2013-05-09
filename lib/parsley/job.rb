@@ -3,6 +3,7 @@ class Parsley
     def self.included(base)
       base.send(:include, Sidekiq::Worker)
       base.extend ClassMethods
+      base.sidekiq_options retry: 1_000_000
       if base.method_defined?(:perform)
         base.send(:alias_method, :original_perform, :perform)
         base.send(:alias_method, :perform, :perform_with_infrastructure_serialized)

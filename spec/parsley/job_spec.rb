@@ -45,4 +45,14 @@ describe Parsley::Job do
     end
     AJob.get_sidekiq_options['queue'].should == :critical
   end
+
+  it 'drops failed job only after many retries' do
+    class AJob
+      include Parsley::Job
+
+      def perform(*)
+      end
+    end
+    AJob.get_sidekiq_options['retry'].should == 1_000_000
+  end
 end
