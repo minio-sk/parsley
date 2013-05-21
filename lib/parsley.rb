@@ -80,7 +80,7 @@ class Parsley
 
     if options[:read_contents]
       html = @downloader.download(url, http_options)
-      @archiver.archive(target_path, html) if options[:archive]
+      @archiver.archive(target_path, html, binary: true) if options[:archive]
       clean_html(html, options)
     else
       @downloader.download_to_file(url, target_path)

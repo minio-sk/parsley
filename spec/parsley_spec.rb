@@ -100,7 +100,7 @@ describe Parsley do
     context 'with :archive option' do
       it 'downloads a file, returns its contents and archives it' do
         downloader.should_receive(:download).with('url', {}).and_return('<html>')
-        archiver.should_receive(:archive).with(Parsley::Path::ArchiveRelative.new('orsr.sk/1/1.html', '/archive'), '<html>')
+        archiver.should_receive(:archive).with(Parsley::Path::ArchiveRelative.new('orsr.sk/1/1.html', '/archive'), '<html>', binary: true)
         infrastructure.download_file('url', read_contents: true, archive: 'orsr.sk/1/1.html').should == "<html>"
       end
 
