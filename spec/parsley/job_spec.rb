@@ -23,15 +23,14 @@ describe Parsley::Job do
   it 'notifies the infrastructure when the job is finished' do
     class AJob
       include Parsley::Job
-      def perform(*)
-        'foo'
-      end
+      def perform(*); end
     end
+    job = AJob.new
 
     infrastructure = mock(:Infrastructure).as_null_object
-    infrastructure.should_receive(:notify_job_finished).with(AJob, 'foo')
+    infrastructure.should_receive(:notify_job_finished).with(job)
 
-    AJob.new.perform(infrastructure)
+    job.perform(infrastructure)
   end
 
   it 'allows queue specification' do

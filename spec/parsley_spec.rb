@@ -271,125 +271,156 @@ describe Parsley do
   end
 
   context 'after the queued job is finished' do
-    class ImportExtract
+    class NextJob
       include Parsley::Job
-
-      def perform(*)
-        {imported_id: 5234}
-      end
-    end
-    class CleanExtract
-      include Parsley::Job
-
-      def perform(*)
-        {id: 5234}
-      end
-    end
-    class DeduplicateExtract
-      include Parsley::Job
-
-      def perform(*)
-      end
-    end
-    class JobThatReturnsFalse
-      include Parsley::Job
-
-      def perform(*)
-        false
-      end
+      def perform(*); end
     end
 
-    it 'enqueues next job in chain, feeding it with the return value of the finished job' do
-      infrastructure.chain ImportExtract, CleanExtract
-
-      infrastructure.should_receive(:enqueue).with(ImportExtract).and_call_original
-      infrastructure.should_receive(:enqueue).with(CleanExtract, {imported_id: 5234})
-
-      infrastructure.enqueue(ImportExtract)
-    end
-
-    it 'serializes the return value if it responds to #serialize' do
-      class JobThatReturnsSerializable
+    it 'enqueues next job in chain, feeding it with the values piped from the finished job' do
+      class JobThatSendsMessage
         include Parsley::Job
+        def perform(infrastructure)
+          infrastructure.message(self, 5234, 43)
+        end
+      end
 
-        def perform(*)
-          Class.new do
+      infrastructure.chain JobThatSendsMessage, NextJob
+
+      infrastructure.should_receive(:enqueue).with(JobThatSendsMessage).and_call_original
+      infrastructure.should_receive(:enqueue).with(NextJob, 5234, 43)
+
+      infrastructure.enqueue(JobThatSendsMessage)
+    end
+
+    it 'enqueues next job even if no args were passed' do
+      class JobThatSendsEmptyMessage
+        include Parsley::Job
+        def perform(infrastructure)
+          infrastructure.message(self)
+        end
+      end
+
+      infrastructure.chain JobThatSendsEmptyMessage, NextJob
+
+      infrastructure.should_receive(:enqueue).with(JobThatSendsEmptyMessage).and_call_original
+      infrastructure.should_receive(:enqueue).with(NextJob)
+
+      infrastructure.enqueue(JobThatSendsEmptyMessage)
+    end
+
+    it 'enqueues next job only after the job finished successfully' do
+      class JobThatSendsMessageAndRaises
+        include Parsley::Job
+        def perform(infrastructure)
+          infrastructure.message(self)
+          raise "hell"
+        end
+      end
+
+      infrastructure.chain JobThatSendsMessageAndRaises, NextJob
+      infrastructure.should_receive(:enqueue).with(JobThatSendsMessageAndRaises).and_call_original
+      infrastructure.should_not_receive(:enqueue).with(NextJob)
+
+      infrastructure.enqueue(JobThatSendsMessageAndRaises) rescue nil
+    end
+
+    it 'serializes message if it responds to #serialize' do
+      class JobThatWantsToEnqueueSerializable
+        include Parsley::Job
+        def perform(infrastructure)
+          arg = Class.new do
             def serialize
               "serialized"
             end
           end.new
+          infrastructure.message(self, arg)
         end
       end
 
-      infrastructure.chain JobThatReturnsSerializable, CleanExtract
-      infrastructure.should_receive(:enqueue).with(JobThatReturnsSerializable).and_call_original
-      infrastructure.should_receive(:enqueue).with(CleanExtract, "serialized")
-      infrastructure.enqueue(JobThatReturnsSerializable)
+      infrastructure.chain JobThatWantsToEnqueueSerializable, NextJob
+
+      infrastructure.should_receive(:enqueue).with(JobThatWantsToEnqueueSerializable).and_call_original
+      infrastructure.should_receive(:enqueue).with(NextJob, "serialized")
+
+      infrastructure.enqueue(JobThatWantsToEnqueueSerializable)
     end
 
-    it 'enqueues next job even if the finished job is further in chain' do
-      infrastructure.chain ImportExtract, CleanExtract, DeduplicateExtract
+    it 'enqueues jobs further down the chain' do
+      class FirstJob
+        include Parsley::Job
+        def perform(infrastructure); infrastructure.message(self); end
+      end
+      class SecondJob
+        include Parsley::Job
+        def perform(infrastructure); infrastructure.message(self); end
+      end
+      class ThirdJob
+        include Parsley::Job
+        def perform(infrastructure); end
+      end
+      infrastructure.chain FirstJob, SecondJob, ThirdJob
 
-      infrastructure.should_receive(:enqueue).with(ImportExtract).and_call_original
-      infrastructure.should_receive(:enqueue).with(CleanExtract, {imported_id: 5234}).and_call_original
-      infrastructure.should_receive(:enqueue).with(DeduplicateExtract, {id: 5234})
+      infrastructure.should_receive(:enqueue).with(FirstJob).and_call_original
+      infrastructure.should_receive(:enqueue).with(SecondJob).and_call_original
+      infrastructure.should_receive(:enqueue).with(ThirdJob)
 
-      infrastructure.enqueue(ImportExtract)
+      infrastructure.enqueue(FirstJob)
     end
 
-    it 'enqueues next job if the finished job has no return value' do
-      infrastructure.chain DeduplicateExtract, CleanExtract
+    it 'does not enqueue next job if the finished job did not message' do
+      class JobThatDoesNotMessage
+        include Parsley::Job
+        def perform(infrastructure); end
+      end
 
-      infrastructure.should_receive(:enqueue).with(DeduplicateExtract).and_call_original
-      infrastructure.should_receive(:enqueue).with(CleanExtract)
+      infrastructure.chain JobThatDoesNotMessage, NextJob
 
-      infrastructure.enqueue(DeduplicateExtract)
-    end
+      infrastructure.should_receive(:enqueue).with(JobThatDoesNotMessage).and_call_original
+      infrastructure.should_not_receive(:enqueue).with(NextJob)
 
-    it 'does not enqueue next job if the finished job returns false' do
-      infrastructure.chain JobThatReturnsFalse, CleanExtract
-
-      infrastructure.should_receive(:enqueue).with(JobThatReturnsFalse).and_call_original
-      infrastructure.should_not_receive(:enqueue).with(CleanExtract)
-
-      infrastructure.enqueue(JobThatReturnsFalse)
+      infrastructure.enqueue(JobThatDoesNotMessage)
     end
 
     it 'enqueues all successors of the finished jobs' do
-      infrastructure.chain ImportExtract, CleanExtract
-      infrastructure.chain ImportExtract, DeduplicateExtract
+      class JobWithManySuccessors
+        include Parsley::Job
+        def perform(infrastructure); infrastructure.message(self); end
+      end
+      class AnotherJob
+        include Parsley::Job
+        def perform(infrastructure); end
+      end
+      class YetAnotherJob
+        include Parsley::Job
+        def perform(infrastructure); end
+      end
 
-      infrastructure.should_receive(:enqueue).with(ImportExtract).and_call_original
-      infrastructure.should_receive(:enqueue).with(CleanExtract, {imported_id: 5234})
-      infrastructure.should_receive(:enqueue).with(DeduplicateExtract, {imported_id: 5234})
+      infrastructure.chain JobWithManySuccessors, AnotherJob
+      infrastructure.chain JobWithManySuccessors, YetAnotherJob
 
-      infrastructure.enqueue(ImportExtract)
+      infrastructure.should_receive(:enqueue).with(JobWithManySuccessors).and_call_original
+      infrastructure.should_receive(:enqueue).with(AnotherJob)
+      infrastructure.should_receive(:enqueue).with(YetAnotherJob)
+
+      infrastructure.enqueue(JobWithManySuccessors)
     end
 
-    context 'when the return value is enumerable' do
-      class ImportIssue
+    it 'enqueues successor for each sent message' do
+      class JobThatSendsMultipleMessages
         include Parsley::Job
-
-        def perform(*)
-          [{path: 'path/to/xml1'}, {path: 'path/to/xml2'}]
-        end
-      end
-      class ImportPleading
-        include Parsley::Job
-
-        def perform(*)
+        def perform(infrastructure)
+          infrastructure.message(self, :foo);
+          infrastructure.message(self, :moo);
         end
       end
 
-      it 'enqueues next job in chain for each element of the enumeration' do
-        infrastructure.chain ImportIssue, ImportPleading
+      infrastructure.chain JobThatSendsMultipleMessages, NextJob
 
-        infrastructure.should_receive(:enqueue).with(ImportIssue).and_call_original
-        infrastructure.should_receive(:enqueue).with(ImportPleading, {path: 'path/to/xml1'})
-        infrastructure.should_receive(:enqueue).with(ImportPleading, {path: 'path/to/xml2'})
+      infrastructure.should_receive(:enqueue).with(JobThatSendsMultipleMessages).and_call_original
+      infrastructure.should_receive(:enqueue).with(NextJob, :foo)
+      infrastructure.should_receive(:enqueue).with(NextJob, :moo)
 
-        infrastructure.enqueue(ImportIssue)
-      end
+      infrastructure.enqueue(JobThatSendsMultipleMessages)
     end
   end
 end

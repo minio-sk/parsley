@@ -23,6 +23,7 @@ class Parsley
     @extractor = options[:extractor] || UnoconvExtractor
     @self_class = options[:self] || self.class
     @job_chain = Hash.new { |hash, key| hash[key] = [] }
+    @messages = Hash.new { |hash, key| hash[key] = [] }
   end
 
   def serialize
@@ -40,20 +41,15 @@ class Parsley
     end
   end
 
-  def notify_job_finished(job_class, results)
-    @job_chain[job_class].each do |successor|
-      results = [results] unless results.kind_of? Array
-      results.each do |result|
-        unless result === false
-          if result
-            encoded_result = result.respond_to?(:serialize) ? result.serialize : result
-            enqueue(successor, encoded_result)
-          else
-            enqueue(successor)
-          end
-        end
-      end
+  def notify_job_finished(job)
+    @job_chain[job.class].each do |successor|
+      @messages[job].each { |args| enqueue(successor, *args) }
     end
+    @messages.delete(job)
+  end
+
+  def message(source, *args)
+    @messages[source] << args.map { |arg| arg.respond_to?(:serialize) ? arg.serialize : arg }
   end
 
   def clean_html(html, options = {})

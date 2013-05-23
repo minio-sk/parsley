@@ -27,7 +27,7 @@ class Parsley
     def perform_with_infrastructure(*args)
       infrastructure = args.last
       result = original_perform(*args)
-      infrastructure.notify_job_finished(self.class, result)
+      infrastructure.notify_job_finished(self)
       result
     end
 
