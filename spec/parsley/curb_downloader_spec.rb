@@ -15,4 +15,16 @@ describe Parsley::CurbDownloader do
 
     described_class.download('url', {useragent: :something})
   end
+
+  it 'passes cookies to curl request' do
+    setup = double(:setup)
+    setup.should_receive(:cookies=).with('sid=123; abc=321;')
+
+    curl = double.as_null_object
+    curl.should_receive(:get).with('url').and_yield(setup).and_return(curl)
+
+    stub_const('Curl', curl)
+
+    described_class.download('url', {cookies: {sid: 123, abc: 321}})
+  end
 end
