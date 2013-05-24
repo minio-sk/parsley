@@ -280,7 +280,7 @@ describe Parsley do
       class JobThatSendsMessage
         include Parsley::Job
         def perform(infrastructure)
-          infrastructure.message(self, 5234, 43)
+          infrastructure.notify_chain(self, 5234, 43)
         end
       end
 
@@ -296,7 +296,7 @@ describe Parsley do
       class JobThatSendsEmptyMessage
         include Parsley::Job
         def perform(infrastructure)
-          infrastructure.message(self)
+          infrastructure.notify_chain(self)
         end
       end
 
@@ -308,11 +308,58 @@ describe Parsley do
       infrastructure.enqueue(JobThatSendsEmptyMessage)
     end
 
+    it 'enqueues next job even if not explicitely signaled' do
+      class JobThatDoesNothing
+        include Parsley::Job
+        def perform(infrastructure)
+        end
+      end
+
+      infrastructure.chain JobThatDoesNothing, NextJob
+
+      infrastructure.should_receive(:enqueue).with(JobThatDoesNothing).and_call_original
+      infrastructure.should_receive(:enqueue).with(NextJob)
+
+      infrastructure.enqueue(JobThatDoesNothing)
+    end
+
+    it 'does not enqueue next job if halted' do
+      class JobThatHaltsChain
+        include Parsley::Job
+        def perform(infrastructure)
+          infrastructure.halt_chain(self)
+        end
+      end
+
+      infrastructure.chain JobThatHaltsChain, NextJob
+
+      infrastructure.should_receive(:enqueue).with(JobThatHaltsChain).and_call_original
+      infrastructure.should_not_receive(:enqueue).with(NextJob)
+      infrastructure.enqueue(JobThatHaltsChain)
+    end
+
+    it 'ignores previous messages if halted' do
+      class JobThatSendsMessageAndHalts
+        include Parsley::Job
+        def perform(infrastructure)
+          infrastructure.notify_chain(self)
+          infrastructure.halt_chain(self)
+        end
+      end
+
+      infrastructure.chain JobThatSendsMessageAndHalts, NextJob
+
+      infrastructure.should_receive(:enqueue).with(JobThatSendsMessageAndHalts).and_call_original
+      infrastructure.should_not_receive(:enqueue).with(NextJob)
+
+      infrastructure.enqueue(JobThatSendsMessageAndHalts)
+    end
+
     it 'enqueues next job only after the job finished successfully' do
       class JobThatSendsMessageAndRaises
         include Parsley::Job
         def perform(infrastructure)
-          infrastructure.message(self)
+          infrastructure.notify_chain(self)
           raise "hell"
         end
       end
@@ -333,7 +380,7 @@ describe Parsley do
               "serialized"
             end
           end.new
-          infrastructure.message(self, arg)
+          infrastructure.notify_chain(self, arg)
         end
       end
 
@@ -348,11 +395,11 @@ describe Parsley do
     it 'enqueues jobs further down the chain' do
       class FirstJob
         include Parsley::Job
-        def perform(infrastructure); infrastructure.message(self); end
+        def perform(infrastructure); infrastructure.notify_chain(self); end
       end
       class SecondJob
         include Parsley::Job
-        def perform(infrastructure); infrastructure.message(self); end
+        def perform(infrastructure); infrastructure.notify_chain(self); end
       end
       class ThirdJob
         include Parsley::Job
@@ -367,24 +414,10 @@ describe Parsley do
       infrastructure.enqueue(FirstJob)
     end
 
-    it 'does not enqueue next job if the finished job did not message' do
-      class JobThatDoesNotMessage
-        include Parsley::Job
-        def perform(infrastructure); end
-      end
-
-      infrastructure.chain JobThatDoesNotMessage, NextJob
-
-      infrastructure.should_receive(:enqueue).with(JobThatDoesNotMessage).and_call_original
-      infrastructure.should_not_receive(:enqueue).with(NextJob)
-
-      infrastructure.enqueue(JobThatDoesNotMessage)
-    end
-
-    it 'enqueues all successors of the finished jobs' do
+    it 'enqueues all successors of the finished job' do
       class JobWithManySuccessors
         include Parsley::Job
-        def perform(infrastructure); infrastructure.message(self); end
+        def perform(infrastructure); infrastructure.notify_chain(self); end
       end
       class AnotherJob
         include Parsley::Job
@@ -409,8 +442,8 @@ describe Parsley do
       class JobThatSendsMultipleMessages
         include Parsley::Job
         def perform(infrastructure)
-          infrastructure.message(self, :foo);
-          infrastructure.message(self, :moo);
+          infrastructure.notify_chain(self, :foo);
+          infrastructure.notify_chain(self, :moo);
         end
       end
 

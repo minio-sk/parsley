@@ -1,6 +1,7 @@
 require 'nokogiri'
 require 'sidekiq'
 
+require 'parsley/chain_manager'
 require 'parsley/paths'
 require 'parsley/command'
 require 'parsley/curb_downloader'
@@ -22,8 +23,7 @@ class Parsley
     @unzipper = options[:unzipper] || SystemUnzipper.new
     @extractor = options[:extractor] || UnoconvExtractor
     @self_class = options[:self] || self.class
-    @job_chain = Hash.new { |hash, key| hash[key] = [] }
-    @messages = Hash.new { |hash, key| hash[key] = [] }
+    @chain_manager = ChainManager.new(self)
   end
 
   def serialize
@@ -36,20 +36,19 @@ class Parsley
   end
 
   def chain(*job_sequence)
-    job_sequence.each_cons(2) do |job, successor|
-      @job_chain[job] << successor
-    end
+    @chain_manager.define(job_sequence)
   end
 
   def notify_job_finished(job)
-    @job_chain[job.class].each do |successor|
-      @messages[job].each { |args| enqueue(successor, *args) }
-    end
-    @messages.delete(job)
+    @chain_manager.job_finished(job)
   end
 
-  def message(source, *args)
-    @messages[source] << args.map { |arg| arg.respond_to?(:serialize) ? arg.serialize : arg }
+  def notify_chain(source, *args)
+    @chain_manager.notify(source, args.map { |arg| arg.respond_to?(:serialize) ? arg.serialize : arg })
+  end
+
+  def halt_chain(source)
+    @chain_manager.halt(source)
   end
 
   def clean_html(html, options = {})
