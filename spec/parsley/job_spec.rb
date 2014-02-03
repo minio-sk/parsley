@@ -55,4 +55,14 @@ describe Parsley::Job do
     end
     AJob.get_sidekiq_options['retry'].should == 1_000_000
   end
+
+  it 'stores backtrace' do
+    class AJob
+      include Parsley::Job
+
+      def perform(*)
+      end
+    end
+    AJob.get_sidekiq_options['backtrace'].should be_true
+  end
 end
