@@ -27,4 +27,16 @@ describe Parsley::CurbDownloader do
 
     described_class.download('url', {cookies: {sid: 123, abc: 321}})
   end
+
+  it 'passes ssl_verify_peer to curl request' do
+    setup = double(:setup)
+    setup.should_receive(:ssl_verify_peer=).with(false)
+
+    curl = double.as_null_object
+    curl.should_receive(:get).with('url').and_yield(setup).and_return(curl)
+
+    stub_const('Curl', curl)
+
+    described_class.download('url', ssl_verify_peer: false)
+  end
 end
