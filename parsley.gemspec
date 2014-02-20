@@ -24,8 +24,8 @@ utilities are installed or some parts of the library will not work.
   unoconv -- for decoding RTF document to plain text
 EOM
 
-  gem.add_development_dependency('rspec', '~> 2.12.0')
+  gem.add_development_dependency('rspec', '~> 2.14.1')
 
   gem.add_dependency('nokogiri', '~> 1.6.0.rc1')
-  gem.add_dependency('sidekiq', '~> 2.6.4')
+  gem.add_dependency('sidekiq', '~> 2.17.0')
 end

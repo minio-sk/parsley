@@ -4,7 +4,7 @@ require 'parsley/paths'
 
 class Parsley
   describe SystemUnzipper do
-    let(:command) { mock(:Command) }
+    let(:command) { double(:Command) }
     let(:target) { Parsley::Path::Full.new('target') }
     subject(:unzipper) { SystemUnzipper.new(command) }
 

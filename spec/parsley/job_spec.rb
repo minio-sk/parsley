@@ -28,7 +28,7 @@ describe Parsley::Job do
       end
     end
 
-    infrastructure = mock(:Infrastructure).as_null_object
+    infrastructure = double(:Infrastructure).as_null_object
     infrastructure.should_receive(:notify_job_finished).with(AJob, 'foo')
 
     AJob.new.perform(infrastructure)

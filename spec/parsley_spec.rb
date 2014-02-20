@@ -41,10 +41,10 @@ describe Parsley do
     end
   end
 
-  let(:downloader) { mock(:Downloader) }
+  let(:downloader) { double(:Downloader) }
   let(:archiver) { double(:Archiver, root: '/archive') }
-  let(:unzipper) { mock(:Unzipper) }
-  let(:extractor) { mock(:Extractor) }
+  let(:unzipper) { double(:Unzipper) }
+  let(:extractor) { double(:Extractor) }
   let(:infrastructure) { Parsley.new(downloader: downloader, archiver: archiver, unzipper: unzipper, extractor: extractor) }
 
   describe '#download_file' do
@@ -129,7 +129,7 @@ describe Parsley do
     end
 
     it 'parses html' do
-      doc = stub
+      doc = double
       Nokogiri.should_receive(:HTML).with('<html>').and_return(doc)
       infrastructure.clean_html('<html>', parse_html: true).should == doc
     end
@@ -137,7 +137,7 @@ describe Parsley do
 
   describe '#download_html' do
     it 'downloads html and returns parsed doc' do
-      doc = stub
+      doc = double
       downloader.stub(download: 'html')
       Nokogiri.should_receive(:HTML).with('html').and_return(doc)
       infrastructure.download_html('url').should == doc
@@ -266,7 +266,7 @@ describe Parsley do
   end
 
   pending 'requests user interaction before queuing' do
-    interaction = mock(:SocPoistCaptchaEntry)
+    interaction = double(:SocPoistCaptchaEntry)
     infrastructure.enqueue_after_user_interaction(interaction, job)
   end
 
