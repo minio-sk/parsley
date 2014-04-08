@@ -3,6 +3,7 @@ class Parsley
     def self.download(url, options = {})
       Curl.get(url) do |curl|
         curl.headers['User-Agent'] = options[:useragent] if options[:useragent]
+        curl.resolve_mode = :ipv4
         curl.ssl_verify_peer = options[:ssl_verify_peer] if options.has_key?(:ssl_verify_peer)
         if options[:cookies]
           cookies = []
